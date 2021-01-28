@@ -1,0 +1,164 @@
+import random
+import sqlite3
+
+
+class SimpleBankingSystem:
+    def __init__(self):
+        self.balance = 0
+        self.data = []
+        self.conn = sqlite3.connect('card.s3db')
+        self.c = self.conn.cursor()
+
+    def menu(self, *option):
+        with self.conn:
+            options = ""
+            self.c.execute('''CREATE TABLE IF NOT EXISTS card
+                (id INTEGER PRIMARY KEY, number TEXT, pin TEXT, balance INTEGER DEFAULT 0)''')
+            while option != "0":
+                option = input("1. Create an account\n2. Log into account\n0. Exit\n")
+                if option == "1":
+                    self.create_account()
+                elif option == "2":
+                    card_question = input("Enter your card number:\n")
+                    pin_question = input("Enter your PIN:\n")
+                    self.get_from_db(card_question, pin_question)
+                    if self.get_from_db(card_question, pin_question) == []:
+                        print("Wrong card number or PIN!")
+                    else:
+                        print("You have successfully logged in!")
+                        while options != "0":
+                            options = input(
+                                "1. Balance\n2. Add income\n3. Do transfer\n4. Close account\n5. Log out\n0. Exit\n")
+                            if options == "1":
+                                print(f"Balance: {self.get_balance(card_question, pin_question)}")
+                            elif options == "2":
+                                money = int(input("Enter income:\n"))
+                                print(self.add_income(card_question, money))
+                            elif options == "3":
+                                print("Transfer")
+                                other_card = input("Enter card number:\n")
+                                if self.verification(other_card) == False:
+                                    print("Probably you made a mistake in the card number. Please try again!")
+                                else:
+                                    if self.check_account(other_card) == None:
+                                        print("Such a card does not exist.")
+                                    elif other_card == card_question:
+                                        print("You can't transfer money to the same account!")
+                                    elif self.check_account(other_card) is not None:
+                                        transfer = input("Enter how much money you want to transfer:\n")
+                                        if int(transfer) > self.get_balance(card_question, pin_question):
+                                            print("Not enough money!")
+                                        else:
+                                            print(self.do_transfer(card_question, other_card, transfer))
+                            elif options == "4":
+                                print(self.close_account(card_question))
+                                break
+                            elif options == "5":
+                                print("You have successfully logged out!")
+                                break
+                            elif options == "0":
+                                exit()
+                                break
+
+        print("Bye!")
+
+    def create_account(self):
+        with self.conn:
+            a = random.randint(000000000, 999999999)
+            number = str(400000000000000 + a)
+            step_2 = list(number)
+            temp = []
+            print("step_2: ", step_2)
+            for index, i in enumerate(step_2):
+                if (index - 1) % 2 != 0:
+                    i = int(i)
+                    i *= 2
+                    temp.append(int(i))
+                else:
+                    i = int(i)
+                    temp.append(int(i))
+            print("temp: ", temp)
+            temp_2 = []
+            for i in temp:
+                if i > 9:
+                    i = i - 9
+                    temp_2.append(i)
+                else:
+                    temp_2.append(i)
+            print("temp: ", temp)
+            print("temp_2: ", temp_2)
+            step_4 = sum(temp_2)
+            print("step_4: ", step_4)
+            if step_4 % 10 > 0:
+                last_digit = 10 - step_4 % 10
+            else:
+                last_digit = 0
+            number = str(number) + str(last_digit)
+            password = str(random.randint(0000, 9999))
+            password = str(password).zfill(4)
+            self.data.append((number, password))
+            print("Your card has been created")
+            print("Your card number:")
+            print(number)
+            print("Your card PIN:")
+            print(password)
+            self.c.execute("INSERT INTO card (number, pin, balance) VALUES (?, ?, ?)", (number, password, self.balance))
+
+    def get_from_db(self, card_question, pin_question):
+        with self.conn:
+            self.c.execute("SELECT * FROM card WHERE number = ? AND pin = ?", (card_question, pin_question))
+            return self.c.fetchall()
+
+    def get_balance(self, card_question, pin_question):
+        with self.conn:
+            self.c.execute("SELECT balance FROM card WHERE number = ? AND pin = ?", (card_question, pin_question))
+            to_return = self.c.fetchone()
+            return to_return[0]
+
+    def add_income(self, card_question, money):
+        with self.conn:
+            self.c.execute("UPDATE card SET balance = balance + ? WHERE number = ?", (money, card_question))
+            return "Income was added!"
+
+    def verification(self, other_card):
+        step_2 = []
+        step_3 = []
+        step_1 = list(other_card)
+        for index, i in enumerate(step_1):
+            if (index - 1) % 2 != 0:
+                i = int(i)
+                i *= 2
+                step_2.append(int(i))
+            else:
+                i = int(i)
+                step_2.append(int(i))
+        for i in step_2:
+            if i > 9:
+                i -= 9
+            step_3.append(i)
+        last = sum(step_3)
+        if last % 10 == 0:
+            return True
+        else:
+            return False
+
+    def check_account(self, other_card):
+        with self.conn:
+            self.c.execute("SELECT * FROM card WHERE number = ?", (other_card,))
+            return self.c.fetchone()
+
+    def do_transfer(self, card_question, other_card, transfer):
+        with self.conn:
+            self.c.execute("UPDATE card SET balance = balance - ? WHERE number = ?", (transfer, card_question))
+            self.c.execute("UPDATE card SET balance = balance + ? WHERE number = ?", (transfer, other_card))
+            return "Success!"
+
+    def close_account(self, card_question):
+        with self.conn:
+            self.c.execute("DELETE FROM card WHERE number = ?", (card_question,))
+            return "The account has been closed!"
+
+
+if __name__ == "__main__":
+    run = SimpleBankingSystem()
+    run.menu()
